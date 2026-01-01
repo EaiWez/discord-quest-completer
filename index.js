@@ -3,14 +3,14 @@
 
     const CONFIG = {
         NAME: "Orion",
-        VERSION: "v3.5",
+        VERSION: "v3.6",
         THEME: "#5865F2",
         SUCCESS: "#3BA55C",
         WARN: "#faa61a",
         ERR: "#f04747",
-        VIDEO_SPEED: 5,
-        FAKE_ACTIVITY: true,
-        GAME_CONCURRENCY: 4,
+
+        VIDEO_SPEED: 2,
+        GAME_CONCURRENCY: 1,
         REQUEST_DELAY: 1500,
         REMOVE_DELAY: 2000
     };
@@ -82,6 +82,7 @@
                 <div id="orion-body"><div style="text-align:center; padding:30px; color:#949ba4; font-size:12px">Initializing System...</div></div>
                 <div id="orion-logs"></div>
                 <div id="orion-footer">Developed by: <a href="https://discord.com/users/1419678867005767783" target="_blank" class="dev-btn">syntt_</a></div>
+                <div id="orion-footer">Patched by: <a href="https://github.com/EaiWez" target="_blank" class="dev-btn">EaiWez</a></div>
             `;
             document.body.appendChild(this.root);
             document.getElementById('orion-close').onclick = () => this.toggle();
@@ -97,17 +98,17 @@
             if (this.tasks.has(id)) {
                 this.tasks.get(id).removing = true;
                 this.render();
-                setTimeout(() => { this.tasks.delete(id); this.render(); }, 500); 
+                setTimeout(() => { this.tasks.delete(id); this.render(); }, 500);
             }
         },
         log(msg, type = 'info') {
             const colors = { info: "#5865F2", success: "#3BA55C", warn: "#faa61a", err: "#f04747", debug: "#999" };
             console.log(`%c[ORION] %c${msg}`, `color: ${CONFIG.THEME}; font-weight: bold;`, `color: ${colors[type] || colors.info}`);
-            const box = document.getElementById('orion-logs'); 
+            const box = document.getElementById('orion-logs');
             if (box) {
                 const el = document.createElement('div'); el.className = `log-item c-${type}`;
                 el.innerHTML = `<span class="log-ts">${new Date().toLocaleTimeString().split(' ')[0]}</span> <span>${msg}</span>`;
-                box.appendChild(el); box.scrollTop = box.scrollHeight; 
+                box.appendChild(el); box.scrollTop = box.scrollHeight;
                 if (box.children.length > 60) box.firstChild.remove();
             }
         },
@@ -152,7 +153,7 @@
                 } catch (e) {
                     if (e.status === 429) {
                         const delay = (e.body?.retry_after || 5) * 1000;
-                        Logger.log(`Rate Limit! Pausing for ${(delay/1000).toFixed(1)}s`, 'warn');
+                        Logger.log(`Rate Limit! Pausing for ${(delay / 1000).toFixed(1)}s`, 'warn');
                         this.queue.unshift(req);
                         await sleep(delay + 1000);
                     } else { req.reject(e); }
@@ -182,62 +183,80 @@
                 this.active = false;
             }
         },
-        add(g) { this.games.push(g); this.toggle(true); this.dispatch(g, []); if (CONFIG.FAKE_ACTIVITY) this.rpc(g); },
-        remove(g) { 
-            this.games = this.games.filter(x => x.pid !== g.pid); 
-            this.dispatch([], [g]); 
-            if (!this.games.length) { this.toggle(false); if (CONFIG.FAKE_ACTIVITY) this.rpc(null); }
-            else if (CONFIG.FAKE_ACTIVITY) this.rpc(this.games[0]);
+        add(g) { this.games.push(g); this.toggle(true); this.dispatch(g, []); },
+        remove(g) {
+            this.games = this.games.filter(x => x.pid !== g.pid);
+            this.dispatch([], [g]);
+            if (!this.games.length) { this.toggle(false); };
         },
         dispatch(added, removed) { Mods.Dispatcher.dispatch({ type: CONST.EVT.GAME, added: added ? [added] : [], removed: removed ? [removed] : [], games: Mods.RunStore.getRunningGames() }); },
-        rpc(g) { 
-            Mods.Dispatcher.dispatch({ type: CONST.EVT.RPC, socketId: null, pid: 9999, activity: g ? { application_id: g.id, name: g.name, type: 0, details: "Orion Helper", state: "Completing Quests", timestamps: { start: g.start }, assets: { large_image: g.id } } : null });
-        },
-        clean() { this.games = []; this.toggle(false); this.rpc(null); }
+
+        clean() {
+            this.games = [];
+            this.toggle(false);
+            Mods.Dispatcher.dispatch({ type: CONST.EVT.RPC, socketId: null, pid: 9999, activity: null });
+        }
     };
 
     const Tasks = {
         async VIDEO(q, t, s) {
             let cur = s.progress?.[t.type]?.value ?? 0;
             Logger.updateTask(q.id, { name: t.name, type: "VIDEO", cur, max: t.target, status: "RUNNING" });
-            
+
             while (cur < t.target) {
                 cur = Math.min(t.target, cur + CONFIG.VIDEO_SPEED);
-                try { 
-                    const r = await Traffic.enqueue(`/quests/${q.id}/video-progress`, { timestamp: cur }); 
-                    if (r.body.completed_at) break; 
-                } catch(e) {}
+                try {
+                    const r = await Traffic.enqueue(`/quests/${q.id}/video-progress`, { timestamp: cur });
+                    if (r.body.completed_at) break;
+                } catch (e) { }
                 Logger.updateTask(q.id, { name: t.name, type: "VIDEO", cur, max: t.target, status: "RUNNING" });
             }
             Tasks.finish(q, t);
         },
         GAME(q, t, s) { return Tasks.generic(q, t, "GAME", "PLAY_ON_DESKTOP", s); },
         STREAM(q, t, s) { return Tasks.generic(q, t, "STREAM", "STREAM_ON_DESKTOP", s); },
-        
+
         generic(q, t, type, key, s) {
-            return new Promise(resolve => {
+            return new Promise(async resolve => {
                 const pid = rnd(10000, 50000);
-                const game = { 
-                    id: t.id, name: t.name, pid: pid, pidPath: [pid],
-                    start: Date.now(), processName: "game",
-                    exeName: "game.exe", exePath: "c:/program files/game/game.exe", 
-                    cmdLine: "C:\\Program Files\\Game\\game.exe",
-                    executables: [{ os: 'win32', name: 'game.exe', is_launcher: false }],
-                    windowHandle: 0, fullscreenType: 0, overlay: true, sandboxed: false,
-                    hidden: false, isLauncher: false
-                };
-                
+
                 if (type === "STREAM") {
                     const real = Mods.StreamStore.getStreamerActiveStreamMetadata;
-                    Mods.StreamStore.getStreamerActiveStreamMetadata = () => ({ id: t.id, pid, sourceName: "Orion" });
+                    Mods.StreamStore.getStreamerActiveStreamMetadata = () => ({ id: t.id, pid, sourceName: null });
                     var cleanupHook = () => Mods.StreamStore.getStreamerActiveStreamMetadata = real;
+
+                    Logger.log(`[${type}] Fake Streaming: ${t.name}`, 'info');
                 } else {
+                    let res;
+                    try {
+                        await Mods.API.get({ url: `/applications/public?application_ids=${t.id}` });
+                    } catch (error) {
+                        Logger.log(`[${type}] Failed to get game: ${t.name} - ${error.message}`, 'err');
+                    }
+                    const app = res?.body?.[0] ?? {};
+                    const appName = app.name ?? t.name;
+
+                    const executables = Array.isArray(app.executables) ? app.executables : [];
+                    const winExe = executables.find(x => x?.os === "win32");
+                    const exeName = (winExe?.name ?? `${appName}.exe}`).replace(">", "");
+
+                    const game = {
+                        id: t.id, name: t.name, pid: pid, pidPath: [pid],
+                        start: Date.now(), processName: appName,
+                        exeName: exeName, exePath: `c:/program files/games/${appName.toLowerCase()}/${exeName}`,
+                        cmdLine: `C:\\Program Files\\Games\\${appName}\\${exeName}`,
+                        executables: [{ os: 'win32', name: exeName, is_launcher: false }],
+                        windowHandle: 0, fullscreenType: 0, overlay: true, sandboxed: false,
+                        hidden: false, isLauncher: false
+                    }
+
                     Patcher.add(game);
                     var cleanupHook = () => Patcher.remove(game);
+
+                    Logger.log(`[${type}] Fake Playing: ${t.name}, EXE: ${game.exeName}, PATH: ${game.exePath}, CMD: ${game.cmdLine}`, 'debug');
                 }
 
                 Logger.updateTask(q.id, { name: t.name, type, cur: 0, max: t.target, status: "RUNNING" });
-                Logger.log(`[${type}] Starting process: ${t.name}`, 'debug');
 
                 const check = (d) => {
                     if (d.questId !== q.id) return;
@@ -262,8 +281,8 @@
         async ACTIVITY(q, t) {
             const chan = Mods.ChanStore.getSortedPrivateChannels()[0]?.id ?? Object.values(Mods.GuildChanStore.getAllGuilds()).find(g => g?.VOCAL?.length)?.VOCAL[0]?.channel?.id;
             if (!chan) return Logger.log(`No voice channel found for ${t.name}`, 'err');
-            
-            const key = `call:${chan}:${rnd(1000,9999)}`;
+
+            const key = `call:${chan}:${rnd(1000, 9999)}`;
             let cur = 0;
             Logger.updateTask(q.id, { name: t.name, type: "ACTIVITY", cur, max: t.target, status: "RUNNING" });
 
@@ -276,7 +295,7 @@
                         await Traffic.enqueue(`/quests/${q.id}/heartbeat`, { stream_key: key, terminal: true });
                         break;
                     }
-                } catch {}
+                } catch { }
                 await sleep(20000);
             }
             Tasks.finish(q, t);
@@ -313,7 +332,7 @@
         for (const task of tasks) {
             const p = task().then(() => executing.splice(executing.indexOf(p), 1));
             executing.push(p);
-            await sleep(500); 
+            await sleep(500);
             if (executing.length >= limit) await Promise.race(executing);
         }
         return Promise.all(executing);
@@ -322,20 +341,20 @@
     async function main() {
         Logger.init();
         if (!loadModules()) return Logger.log('Failed to load modules', 'err');
-        
+
         let loopCount = 1;
-        while(true) {
+        while (true) {
             Logger.log(`Starting Cycle #${loopCount}...`, 'info');
             const getQuests = () => (Mods.QuestStore.quests instanceof Map ? [...Mods.QuestStore.quests.values()] : Object.values(Mods.QuestStore.quests));
             let quests = getQuests();
-            
+
             const incomplete = quests.filter(q => !q.userStatus?.completedAt && new Date(q.config.expiresAt).getTime() > Date.now() && q.id !== CONST.ID);
             const toEnroll = incomplete.filter(q => !q.userStatus?.enrolledAt);
 
             if (toEnroll.length > 0) {
                 Logger.log(`Enrolling in ${toEnroll.length} new quests...`, 'warn');
                 for (const q of toEnroll) await Traffic.enqueue(`/quests/${q.id}/enroll`, { location: 1 });
-                await sleep(1500); quests = getQuests(); 
+                await sleep(1500); quests = getQuests();
             }
 
             const active = quests.filter(q => !q.userStatus?.completedAt && new Date(q.config.expiresAt).getTime() > Date.now() && q.id !== CONST.ID);
@@ -349,10 +368,10 @@
                 const taskKeys = Object.keys(cfg.tasks);
                 let type = null, target = 0, keyName = "";
 
-                if (taskKeys.some(k => k.includes("PLAY"))) { type = "GAME"; keyName = taskKeys.find(k => k.includes("PLAY")); } 
-                else if (taskKeys.some(k => k.includes("STREAM"))) { type = "STREAM"; keyName = taskKeys.find(k => k.includes("STREAM")); } 
-                else if (taskKeys.some(k => k.includes("VIDEO"))) { type = "WATCH_VIDEO"; keyName = taskKeys.find(k => k.includes("VIDEO")); } 
-                else if (taskKeys.some(k => k.includes("ACTIVITY"))) { type = "ACTIVITY"; keyName = taskKeys.find(k => k.includes("ACTIVITY")); } 
+                if (taskKeys.some(k => k.includes("PLAY"))) { type = "GAME"; keyName = taskKeys.find(k => k.includes("PLAY")); }
+                else if (taskKeys.some(k => k.includes("STREAM"))) { type = "STREAM"; keyName = taskKeys.find(k => k.includes("STREAM")); }
+                else if (taskKeys.some(k => k.includes("VIDEO"))) { type = "WATCH_VIDEO"; keyName = taskKeys.find(k => k.includes("VIDEO")); }
+                else if (taskKeys.some(k => k.includes("ACTIVITY"))) { type = "ACTIVITY"; keyName = taskKeys.find(k => k.includes("ACTIVITY")); }
                 else if (q.config.application.id) { type = "GAME"; keyName = "PLAY_ON_DESKTOP"; target = cfg.tasks[taskKeys[0]].target; }
 
                 if (keyName && !target) target = cfg.tasks[keyName].target;
@@ -383,7 +402,7 @@
             Logger.log(`Cycle #${loopCount} complete. Rescanning...`, 'success');
             await sleep(3000); loopCount++;
         }
-        
+
         Logger.log('Orion finished. Closing in 5s...', 'success');
         setTimeout(() => { Logger.root.remove(); window.orionLock = false; }, 5000);
     }
