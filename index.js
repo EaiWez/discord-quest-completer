@@ -229,7 +229,7 @@
                 } else {
                     let res;
                     try {
-                        await Mods.API.get({ url: `/applications/public?application_ids=${t.id}` });
+                        res = await Mods.API.get({ url: `/applications/public?application_ids=${t.id}` });
                     } catch (error) {
                         Logger.log(`[${type}] Failed to get game: ${t.name} - ${error.message}`, 'err');
                     }
@@ -253,7 +253,7 @@
                     Patcher.add(game);
                     var cleanupHook = () => Patcher.remove(game);
 
-                    Logger.log(`[${type}] Fake Playing: ${t.name}, EXE: ${game.exeName}, PATH: ${game.exePath}, CMD: ${game.cmdLine}`, 'debug');
+                    Logger.log(`[${type}] Fake Playing: ${t.name}`, 'debug');
                 }
 
                 Logger.updateTask(q.id, { name: t.name, type, cur: 0, max: t.target, status: "RUNNING" });
