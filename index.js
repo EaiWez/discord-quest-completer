@@ -1,7 +1,7 @@
 (async () => {
     "use strict";
 
-const CONFIG = {
+    const CONFIG = {
         NAME: "Orion",
         VERSION: "v3.6",
         THEME: "#5865F2",
@@ -29,8 +29,8 @@ const CONFIG = {
     };
 
     const Storage = {
-        save(key, value) { try { window.localStorage.setItem(`orion_${key}`, JSON.stringify(value)); } catch(e){} },
-        load(key) { try { const v = window.localStorage.getItem(`orion_${key}`); return v ? JSON.parse(v) : null; } catch(e){ return null; } }
+        save(key, value) { try { window.localStorage.setItem(`orion_${key}`, JSON.stringify(value)); } catch (e) { } },
+        load(key) { try { const v = window.localStorage.getItem(`orion_${key}`); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
     };
 
     const Logger = {
@@ -38,7 +38,7 @@ const CONFIG = {
         init() {
             const old = document.getElementById('orion-ui'); if (old) old.remove();
             const savedPos = Storage.load('pos') || { top: '20px', left: 'auto', right: '20px' };
-            
+
             const style = document.createElement('style');
             style.innerHTML = `
                 @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -95,13 +95,13 @@ const CONFIG = {
                 <div id="orion-body"><div style="text-align:center; padding:30px; color:#949ba4; font-size:12px">Initializing System...</div></div>
                 <div id="orion-logs"></div>
                 <div id="orion-footer">Developed by: <a href="https://discord.com/users/1419678867005767783" target="_blank" class="dev-btn">syntt_</a></div>
-                <div id="orion-footer">Patched by: <a href="https://github.com/EaiWez" target="_blank" class="dev-btn">EaiWez</a></div>
+                <div id="orion-footer">Forked by: <a href="https://github.com/EaiWez" target="_blank" class="dev-btn">EaiWez</a></div>
             `;
             document.body.appendChild(this.root);
-            
+
             const head = document.getElementById('orion-head');
             let isDragging = false, startX, startY, initialLeft, initialTop;
-            
+
             head.onmousedown = e => {
                 isDragging = true;
                 startX = e.clientX; startY = e.clientY;
@@ -110,7 +110,7 @@ const CONFIG = {
                 this.root.style.right = 'auto';
                 e.preventDefault();
             };
-            
+
             document.onmousemove = e => {
                 if (!isDragging) return;
                 const dx = e.clientX - startX;
@@ -118,9 +118,9 @@ const CONFIG = {
                 this.root.style.left = `${initialLeft + dx}px`;
                 this.root.style.top = `${initialTop + dy}px`;
             };
-            
+
             document.onmouseup = () => {
-                if(isDragging) {
+                if (isDragging) {
                     isDragging = false;
                     Storage.save('pos', { top: this.root.style.top, left: this.root.style.left, right: 'auto' });
                 }
@@ -128,8 +128,8 @@ const CONFIG = {
 
             document.getElementById('orion-close').onclick = () => this.toggle();
             document.addEventListener('keydown', e => (e.key === '>' || (e.shiftKey && e.key === '.')) && this.toggle());
-            
-            try { if (Notification.permission === "default") Notification.requestPermission(); } catch(e){}
+
+            try { if (Notification.permission === "default") Notification.requestPermission(); } catch (e) { }
         },
         toggle() { this.root.style.display = this.root.style.display === 'none' ? 'flex' : 'none'; },
         updateTask(id, data) {
@@ -348,7 +348,7 @@ const CONFIG = {
         finish(q, t) {
             Logger.updateTask(q.id, { name: t.name, type: t.type, cur: t.target, max: t.target, status: "COMPLETED" });
             Logger.log(`Completed: ${t.name}`, 'success');
-            try { if(Notification.permission === "granted") new Notification("Orion: Quest Completed", { body: t.name, icon: "https://cdn.discordapp.com/emojis/1120042457007792168.webp" }); } catch(e){}
+            try { if (Notification.permission === "granted") new Notification("Orion: Quest Completed", { body: t.name, icon: "https://cdn.discordapp.com/emojis/1120042457007792168.webp" }); } catch (e) { }
             setTimeout(() => Logger.removeTask(q.id), CONFIG.REMOVE_DELAY);
         }
     };
@@ -425,14 +425,14 @@ const CONFIG = {
                 // Pass BOTH ID Types:
                 // id: Quest ID (for UI uniqueness)
                 // appId: Application ID (for Fake Process)
-                const tInfo = { 
-                    id: q.id, 
-                    appId: q.config.application.id, 
-                    name: q.config.messages.questName, 
-                    target: target, 
-                    type: type 
+                const tInfo = {
+                    id: q.id,
+                    appId: q.config.application.id,
+                    name: q.config.messages.questName,
+                    target: target,
+                    type: type
                 };
-                
+
                 Logger.updateTask(tInfo.id, { name: tInfo.name, type: tInfo.type, cur: 0, max: tInfo.target, status: "QUEUE" });
 
                 if (type === "WATCH_VIDEO") queue.videos.push(Tasks.VIDEO(q, tInfo, q.userStatus));
